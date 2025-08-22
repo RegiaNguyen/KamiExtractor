@@ -52,4 +52,4 @@ born after 8 hours of fighting Linux-biased code at 2 AM.
 - No data corruption.  
 - *It just works™.*
 
-![Gaming + Extractor](assets/Screenshot_2025-08-23_040254)
+![Gaming + Extractor](assets/Screenshot_2025-08-23_040254) 
