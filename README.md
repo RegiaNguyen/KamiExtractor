@@ -33,4 +33,4 @@ python tools/mini_extractor.py \
   --output extracted_viwiki \
   --json \
   --max-bytes 104857600 \
-  --limit 100000
+  --limit 100000 (or just remove this limit to processes them all) 
