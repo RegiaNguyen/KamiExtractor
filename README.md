@@ -34,3 +34,13 @@ python tools/mini_extractor.py \
   --json \
   --max-bytes 104857600 \
   --limit 100000 (or just remove this limit to processes them all) 
+
+## 📸 Demo
+
+KamiExtractor running live on Windows PowerShell —  
+born after 8 hours of fighting Linux-biased code at 2 AM.  
+(Yes, it really chews through millions of pages while Lil Nas X plays in the background 🎶)
+
+![KamiExtractor processing 2.2M pages](assets/extractor_viwiki.png)
+
+![KamiExtractor processing enwiki](assets/extractor_enwiki.png)
