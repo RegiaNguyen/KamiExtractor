@@ -44,3 +44,12 @@ born after 8 hours of fighting Linux-biased code at 2 AM.
 ![KamiExtractor processing 2.2M pages](assets/extractor_viwiki.png)
 
 ![KamiExtractor processing enwiki](assets/extractor_enwiki.png)
+
+## Milestone  
+- Total pages visited: **2,209,724** viwiki articles (.bz2).  
+- Surpassed **17,000,000** pages from English Wikipedia (.bz2) — stable run even while multitasking (games, Discord, YouTube).  
+- No crashes.  
+- No data corruption.  
+- *It just works™.*
+
+![Gaming + Extractor](assets/Screenshot_2025-08-23_040254)
