@@ -1,0 +1,152 @@
+# mini_wikiextract.py
+# Windows-friendly Wikipedia dump extractor (no external deps)
+# Usage:
+python mini_extractor.py \
+  --input path/to/viwiki-latest-pages-articles.xml.bz2 \
+  --output extracted_viwiki \
+  --json \
+  --max-bytes 104857600 \
+  --namespaces 0
+
+# Example
+python mini_extractor.py --input viwiki.xml.bz2 --output out --json
+
+import os, bz2, io, argparse, json, re, sys
+import xml.etree.ElementTree as ET
+
+#--- Cleaning: Fast and Furious ---
+RE_COMMENT   = re.compile(r'<!--.*?-->', re.DOTALL)
+RE_REF_TAG   = re.compile(r'<ref[^>]*?>.*?</ref>|<ref[^/>]*/>', re.DOTALL|re.IGNORECASE)
+RE_TABLE     = re.compile(r'\{\|.*?\|\}', re.DOTALL)                 # {| ... |}
+RE_TEMPL     = re.compile(r'\{\{.*?\}\}', re.DOTALL)                 # {{ ... }}
+RE_FILE      = re.compile(r'\[\[(?:File|Image|Tập_tin|Hình):.*?\]\]', re.IGNORECASE|re.DOTALL)
+RE_URL       = re.compile(r'https?://\S+')
+RE_TAGS      = re.compile(r'</?[^>]+>')                              # leftover html-ish
+RE_HEADING   = re.compile(r'^\s*=+\s*(.*?)\s*=+\s*$', re.MULTILINE)  # == Heading ==
+RE_LISTMARK  = re.compile(r'^[*#;:]+\s*', re.MULTILINE)
+RE_NOWIKI    = re.compile(r'<nowiki>.*?</nowiki>', re.DOTALL|re.IGNORECASE)
+RE_CODE      = re.compile(r'<code>.*?</code>|<pre>.*?</pre>', re.DOTALL|re.IGNORECASE)
+
+LINK_PIPE    = re.compile(r'\[\[(?:[^[\]|]+)\|([^[\]]+)\]\]')        # [[target|text]] -> text
+LINK_SOLO    = re.compile(r'\[\[([^[\]|#]+)(?:#[^\]]+)?\]\]')        # [[target]] -> target
+
+def clean(text: str) -> str:
+    if not text: return ''
+    t = text
+    t = RE_COMMENT.sub(' ', t)
+    t = RE_REF_TAG.sub(' ', t)
+    t = RE_NOWIKI.sub(' ', t)
+    t = RE_CODE.sub(' ', t)
+    t = RE_TABLE.sub(' ', t)
+    t = RE_FILE.sub(' ', t)
+    
+    # links
+    t = LINK_PIPE.sub(r'\1', t)
+    t = LINK_SOLO.sub(r'\1', t)   
+    # templates (last, because they can nest)
+    t = RE_TEMPL.sub(' ', t)
+    # headings / lists / tags / urls
+    t = RE_HEADING.sub(r'\1\n', t)
+    t = RE_LISTMARK.sub('', t)
+    t = RE_TAGS.sub(' ', t)
+    t = RE_URL.sub(' ', t)
+    # markup leftovers
+    t = t.replace("'''''", ' ').replace("'''", ' ').replace("''", ' ')
+    # collapse whitespace
+    t = re.sub(r'[ \t\u00A0]+', ' ', t)
+    t = re.sub(r'\n{3,}', '\n\n', t)
+    return t.strip()
+
+#--- streaming parser ---
+def open_stream(path):
+    if path.endswith('.bz2'):
+        return bz2.open(path, 'rb')
+    return open(path, 'rb')
+
+def ensure_dir(p):
+    os.makedirs(p, exist_ok=True)
+    
+def shard_writer(out_dir, max_bytes, jsonl=True):
+    ensure_dir(out_dir)
+    idx, fp, used = 0, None, 0
+    
+    def rotate():
+        nonlocal idx, fp, used
+        if fp: fp.close()
+        fname = f'wiki_{idx:05d}.{"jsonl" if jsonl else "txt"}'
+        fp = open(os.path.join(out_dir, fname), 'wb')
+        used = 0
+        idx += 1
+        
+    rotate()
+    
+    def write(rec: dict | str):
+        nonlocal used
+        data = (json. dumps(rec, ensure_ascii=False)+'\n').encode('utf-8') if isinstance(rec, dict) else (rec+'\n').encode('utf-8')
+        if max_bytes and used + len(data) > max_bytes:
+            rotate()
+        fp.write(data)
+        used += len(data) 
+        
+    def close():
+        if fp: fp.close()
+        
+    return write, close
+
+def extract(input_path, out_dir, namespaces, max_bytes, jsonl, limit=None):
+    write, close = shard_writer(out_dir, max_bytes, jsonl=jsonl)
+    count = 0
+    with open_stream(input_path) as fh:
+        #iterparse pageby page to keep memory low
+        ctx = ET.iterparse(fh, events=('end',))
+        for event, elem in ctx:
+            if elem.tag.endswith('page'):
+                ns = elem.find('./{*ns}')
+                nsid = int(ns.text) if ns is not None and ns.text.isdigit() else 0
+                if namespaces and nsid not in namespaces: 
+                    elem.clear(); continue
+                    
+                title = (elem.find('./{*}title').text or '').strip()
+                pid = (elem.find('./{*}id').text or '').strip()
+                rev = elem.find('./{*}revision')
+                txtEl = rev.find('./{*}text') if rev is not None else None 
+                txt = txtEl.text if (txtEl is not None and txtEl.text) else ''
+                cleaned = clean(txt)
+                
+                if cleaned:
+                    rec = {"id": pid, "title": title, "ns": nsid, "text": cleaned}
+                    write(rec)
+                    
+                count += 1
+                if count % 10000 == 0:
+                    print(f"[mini] processed {count:,} pages...", file=sys.stderr)
+                if limit and count >= limit:
+                    break 
+                
+                elem.clear() # free memory
+                
+    close()
+    print(f"[mini] done. total pages visited: {count:,}")
+
+def parse_args():
+    ap = argparse.ArgumentParser(description="Mini Wikipedia Extractor (Windows-friendly)")
+    ap.add_argument('--input',  required=True, help='path to viwiki/enwiki XML or XML.BZ2')
+    ap.add_argument('--output', required=True, help='output directory')
+    ap.add_argument('--jsonl',  action='store_true', help='emit JSONL (default true)')
+    ap.add_argument('--max-bytes', type=int, default=100_000_000, help='max bytes per shard file (default 100MB)')
+    ap.add_argument('--namespaces', type=int, nargs='*', default=[0], help='allowed namespace ids (default: 0)')
+    ap.add_argument('--limit', type=int, default=None, help='stop after N pages (debug)')
+    return ap.parse_args()
+
+if __name__ == '__main__':
+    args = parse_args()
+    extract(
+        input_path=args.input, 
+        out_dir=args.output,
+        
+        namespaces=set(args.namespaces or []),
+        max_bytes=args.max_bytes,
+        
+        jsonl=True,  # we always output jsonl; flag kept for future parity
+        limit=args.limit     
+    )
