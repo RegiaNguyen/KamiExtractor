@@ -46,7 +46,7 @@ born after 8 hours of fighting Linux-biased code at 2 AM.
 ![KamiExtractor processing enwiki](assets/extractor_enwiki.png)
 
 ## Milestone  
-- Total pages visited: **2,209,724** viwiki articles (.bz2) and **24,878,638* enwiki articles (.bz2). 
+- Total pages visited: **2,209,724** viwiki articles (.bz2) and **24,878,638** enwiki articles (.bz2). 
 - Surpassed **17,000,000** pages from English Wikipedia (.bz2) — stable run even while multitasking (games, Discord, YouTube).  
 - No crashes.  
 - No data corruption.  
