@@ -1,15 +1,5 @@
 # mini_wikiextract.py
-# Windows-friendly Wikipedia dump extractor (no external deps)
-# Usage:
-python mini_extractor.py \
-  --input path/to/viwiki-latest-pages-articles.xml.bz2 \
-  --output extracted_viwiki \
-  --json \
-  --max-bytes 104857600 \
-  --namespaces 0
-
-# Example
-python mini_extractor.py --input viwiki.xml.bz2 --output out --json
+# Windows-friendly Wikipedia dump extractor (no external deps
 
 import os, bz2, io, argparse, json, re, sys
 import xml.etree.ElementTree as ET
